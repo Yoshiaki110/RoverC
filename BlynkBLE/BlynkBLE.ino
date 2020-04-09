@@ -7,8 +7,7 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 
-// You should get Auth Token in the Blynk App.
-// Go to the Project Settings (nut icon).
+// BlynkのAuth Token
 char auth[] = "NNN7TXQARjFvfytycvg3xN_-eELLkIQJ";
 
 void SetChargingCurrent(uint8_t CurrentLevel)
@@ -24,8 +23,7 @@ uint8_t I2CWritebuff(uint8_t Addr, uint8_t *Data, uint16_t Length)
 {
   Wire.beginTransmission(0x38);
   Wire.write(Addr);
-  for (int i = 0; i < Length; i++)
-  {
+  for (int i = 0; i < Length; i++) {
       Wire.write(Data[i]);
   }
   return Wire.endTransmission();
@@ -51,12 +49,7 @@ void setup()
   Wire.begin(0, 26, 10000);
   SetChargingCurrent(4);
   Serial.println("setup completed");
-  digitalWrite(GPIO_NUM_10, LOW);
 }
-
-//int8_t speed_sendbuff[4] = {0};
-//float f, b, l, r, rr, rl = 0.0;
-//float limit = 1.0;
 
 int FORWARD[4]     = {50, 50, 50, 50};
 int LEFT[4]        = {-50, 50, 50, -50};
@@ -64,7 +57,6 @@ int BACKWARD[4]    = {-50, -50, -50, -50};
 int RIGHT[4]       = {50, -50, -50, 50};
 int ROTATE_L[4]    = {-30, 30, -30, 30};
 int ROTATE_R[4]    = {30, -30, 30, -30};
-
 
 // 無入力の時の値
 // スティックを倒すと00~80~FFの値で変化する
@@ -95,11 +87,6 @@ void control() {
       printf("b = %f\n", b);
     }
   }
-//  else {
-//    // センターの場合リセットする
-//    f = 0.0;
-//    b = 0.0;
-//  }
   // 左スティックが倒されていたら（左右）
   if ((unsigned)l_rightleft != (unsigned)LEVER_LEFT_CENTER) {
     if ((unsigned)l_rightleft < (unsigned)LEVER_LEFT_CENTER) {
@@ -113,10 +100,6 @@ void control() {
 //    printf("r = %f\n", r);
     }   
   }
-//  else {
-//    l = 0.0;
-//    r = 0.0;
-//  }
   // 右スティックが倒されていたら（左右）
   if ((unsigned)r_rightleft != (unsigned)LEVER_LEFT_CENTER) {
     if ((unsigned)r_rightleft < (unsigned)LEVER_LEFT_CENTER) {
@@ -130,10 +113,6 @@ void control() {
 //    printf("rr = %f\n", rr);
     }
   }
-//  else {
-//    rl = 0.0;
-//    rr = 0.0;
-//  }
   Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
 
   // 前後左右回転それぞれをスティックの倒れ具合と掛けて足す
@@ -174,6 +153,15 @@ void loop()
   control();
 }
 
+BLYNK_WRITE(V0) {
+  int16_t led = param[0].asInt();
+  if(led == 0){
+    digitalWrite(GPIO_NUM_10, HIGH);
+  }
+  if(led == 1){
+    digitalWrite(GPIO_NUM_10, LOW);
+  }
+}
 BLYNK_WRITE(V1) {
   l_updown = param[0].asInt();
 //  Serial.println("V1:");
