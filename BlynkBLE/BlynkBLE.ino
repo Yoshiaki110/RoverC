@@ -54,13 +54,9 @@ void setup()
   digitalWrite(GPIO_NUM_10, LOW);
 }
 
-uint8_t l_rightleft;
-uint8_t l_updown;
-uint8_t r_rightleft;
-
-int8_t speed_sendbuff[4] = {0};
-float f, b, l, r, rr, rl = 0.0;
-float limit = 1.0;
+//int8_t speed_sendbuff[4] = {0};
+//float f, b, l, r, rr, rl = 0.0;
+//float limit = 1.0;
 
 int FORWARD[4]     = {50, 50, 50, 50};
 int LEFT[4]        = {-50, 50, 50, -50};
@@ -71,64 +67,74 @@ int ROTATE_R[4]    = {30, -30, 30, -30};
 
 
 // 無入力の時の値
-// スティックを倒すと00~7F~FFの値で変化する
-const uint8_t LEVER_LEFT_CENTER = 0x7F;
+// スティックを倒すと00~80~FFの値で変化する
+const uint8_t LEVER_LEFT_CENTER = 0x80;
+
+uint8_t l_rightleft = LEVER_LEFT_CENTER;
+uint8_t l_updown = LEVER_LEFT_CENTER;
+uint8_t r_rightleft = LEVER_LEFT_CENTER;
 
 void control() {
-  const uint8_t * ptr = (const uint8_t *) data;
-
-  if (l_updown != LEVER_LEFT_CENTER) {
-  // 左スティックが倒されていたら
-    if (l_updown < LEVER_LEFT_CENTER) {
+  int8_t speed_sendbuff[4] = {0};
+  float f, b, l, r, rr, rl = 0.0;
+  float limit = 1.0;
+  Serial.printf("Lrf:%d Lud:%d Rud:%d\n", l_rightleft, l_updown, r_rightleft);
+  Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
+  // 左スティックが倒されていたら（上下）
+  if ((unsigned)l_updown != (unsigned)LEVER_LEFT_CENTER) {
+    if ((unsigned)l_updown < (unsigned)LEVER_LEFT_CENTER) {
       // 前進
       // スティックの倒され具合により0.0~1.0に設定
-      f = ((LEVER_LEFT_CENTER - l_updown / 128.0);
-//    printf("f = %f\n", f);
+      f = ((LEVER_LEFT_CENTER - l_updown) / 128.0);
+      printf("f = %f\n", f);
     }
-    if (l_updown > LEVER_LEFT_CENTER) {
+    if ((unsigned)l_updown > (unsigned)LEVER_LEFT_CENTER) {
       // 後退
       // スティックの倒され具合により0.0~1.0に設定
       b = ((l_updown - LEVER_LEFT_CENTER) / 128.0);
-//    printf("b = %f\n", b);
+      printf("b = %f\n", b);
     }
   }
-  else {
-    // センターの場合リセットする
-    f = 0.0;
-    b = 0.0;
-  }
-  if (l_rightleft != LEVER_LEFT_CENTER) {
-    if (l_rightleft < LEVER_LEFT_CENTER) {
+//  else {
+//    // センターの場合リセットする
+//    f = 0.0;
+//    b = 0.0;
+//  }
+  // 左スティックが倒されていたら（左右）
+  if ((unsigned)l_rightleft != (unsigned)LEVER_LEFT_CENTER) {
+    if ((unsigned)l_rightleft < (unsigned)LEVER_LEFT_CENTER) {
       // 左進
       l = ((LEVER_LEFT_CENTER - l_rightleft) / 128.0);
 //    printf("l = %f\n", l);
     }
-    if (l_rightleft > LEVER_LEFT_CENTER) {
+    if ((unsigned)l_rightleft > (unsigned)LEVER_LEFT_CENTER) {
       // 右進
       r = ((l_rightleft - LEVER_LEFT_CENTER) / 128.0);
 //    printf("r = %f\n", r);
     }   
   }
-  else {
-    l = 0.0;
-    r = 0.0;
-  }
-  if (r_rightleft != LEVER_LEFT_CENTER) {
-    if (r_rightleft < LEVER_LEFT_CENTER) {
+//  else {
+//    l = 0.0;
+//    r = 0.0;
+//  }
+  // 右スティックが倒されていたら（左右）
+  if ((unsigned)r_rightleft != (unsigned)LEVER_LEFT_CENTER) {
+    if ((unsigned)r_rightleft < (unsigned)LEVER_LEFT_CENTER) {
       // 左回転
       rl = ((LEVER_LEFT_CENTER - r_rightleft) / 128.0);
 //    printf("rl = %f\n", rl);
     }
-    if (r_rightleft > LEVER_LEFT_CENTER) {
+    if ((unsigned)r_rightleft > (unsigned)LEVER_LEFT_CENTER) {
       // 右回転
       rr = ((r_rightleft - LEVER_LEFT_CENTER) / 128.0);
 //    printf("rr = %f\n", rr);
     }
   }
-  else {
-    rl = 0.0;
-    rr = 0.0;
-  }
+//  else {
+//    rl = 0.0;
+//    rr = 0.0;
+//  }
+  Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
 
   // 前後左右回転それぞれをスティックの倒れ具合と掛けて足す
   for (int i = 0; i < 4; i++) {
@@ -150,7 +156,7 @@ void control() {
       )
     );
   }
-  printf("limit = %f\n", limit);
+  //printf("limit = %f\n", limit);
   if (1.0 < limit) {
     limit = 1.0;
   }
@@ -169,14 +175,22 @@ void loop()
 }
 
 BLYNK_WRITE(V1) {
-  l_rightleft = param[0].asInt();
+  l_updown = param[0].asInt();
+//  Serial.println("V1:");
+//  Serial.println(param[0].asInt());
 }
 BLYNK_WRITE(V2) {
-  l_updown = param[0].asInt();
+  l_rightleft = param[0].asInt();
+//  Serial.println("V2:");
+//  Serial.println(param[0].asInt());
 }
 BLYNK_WRITE(V3) {
-  r_rightleft = param[0].asInt();
+  int16_t temp = param[0].asInt();
+//  Serial.println("V3:");
+//  Serial.println(param[0].asInt());
 }
 BLYNK_WRITE(V4) {
-  int16_t temp = param[0].asInt();
+  r_rightleft = param[0].asInt();
+//  Serial.println("V4:");
+//  Serial.println(param[0].asInt());
 }
