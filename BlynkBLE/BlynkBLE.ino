@@ -7,6 +7,32 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 
+// UART
+HardwareSerial serial_ext(2);
+
+int u_read() {
+  int ret = -1;
+  int rx_size = 0;
+  uint8_t rx_buffer[10];
+  if (serial_ext.available()>0) {
+    rx_size = serial_ext.readBytes(rx_buffer, 1);
+    if (rx_buffer[0] == 0xFF) {
+      if (serial_ext.available()>0) {
+        rx_size = serial_ext.readBytes(rx_buffer, 1);
+        if (rx_buffer[0] == 0xAA) {
+          if (serial_ext.available()>0) {
+            rx_size = serial_ext.readBytes(rx_buffer, 1);
+            ret = rx_buffer[0];
+            printf("%d - %d\n", rx_size, ret);
+          }
+        }
+      }
+    }
+  }
+  printf("uread:%d\n", ret);
+  return ret;
+}
+
 // BlynkのAuth Token
 char auth[] = "NNN7TXQARjFvfytycvg3xN_-eELLkIQJ";
 
@@ -21,6 +47,7 @@ void SetChargingCurrent(uint8_t CurrentLevel)
 // 指定アドレスにｎバイト書き込み
 uint8_t I2CWritebuff(uint8_t Addr, uint8_t *Data, uint16_t Length)
 {
+  Serial.printf("power = %d, %d, %d, %d\n", Data[0], Data[1], Data[2], Data[3]);
   Wire.beginTransmission(0x38);
   Wire.write(Addr);
   for (int i = 0; i < Length; i++) {
@@ -40,6 +67,7 @@ void setup()
   
   // Debug console
   Serial.begin(115900);
+  serial_ext.begin(115200, SERIAL_8N1, 32, 33);
 
   Serial.println("Waiting for connections...");
   Blynk.setDeviceName("M5StickC_RoverC");
@@ -142,23 +170,46 @@ void control() {
   for (int i = 0; i < 4; i++) {
     speed_sendbuff[i] = speed_sendbuff[i] * limit;
   }
-  Serial.printf("power = %d, %d, %d, %d\n", speed_sendbuff[0], speed_sendbuff[1], speed_sendbuff[2], speed_sendbuff[3]);
+//  Serial.printf("power = %d, %d, %d, %d\n", speed_sendbuff[0], speed_sendbuff[1], speed_sendbuff[2], speed_sendbuff[3]);
 
   I2CWritebuff(0x00, (uint8_t *)speed_sendbuff, 4);
 }
 
+int16_t face = 0;
+
+byte RR[] = {20,-20,20,-20};
+byte RL[] = {-20,20,-20,20};
+byte STP[] = {0,0,0,0};
 void loop()
 {
   Blynk.run();
   control();
+  int r = u_read();
+  if (r != -1) {          // UARTの入力があった
+    if (face != 0){
+      if (r == 1) {
+        I2CWritebuff(0x00, (uint8_t *)RR, 4);
+      } else if (r = 2) {
+        I2CWritebuff(0x00, (uint8_t *)RL, 4);
+      }
+      delay(50);
+      I2CWritebuff(0x00, (uint8_t *)STP, 4);
+    }
+    for (;;) {           // UARTのクリア
+      if (serial_ext.available() == 0) {
+        break;
+      }
+      uint8_t buff[1];
+      serial_ext.readBytes(buff, 1);
+    }
+  }
 }
 
 BLYNK_WRITE(V0) {
-  int16_t led = param[0].asInt();
-  if(led == 0){
+  face = param[0].asInt();
+  if (face == 0){
     digitalWrite(GPIO_NUM_10, HIGH);
-  }
-  if(led == 1){
+  } else {
     digitalWrite(GPIO_NUM_10, LOW);
   }
 }
