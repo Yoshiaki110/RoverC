@@ -124,10 +124,10 @@ try:
             print(str(c) + ' ' + str(len(bbox)))
             if c < 120:
                 print('>>>')
-                u_send(2)
+                u_send(200)
             if c > 160:
                 print('<<<')
-                u_send(1)
+                u_send(201)
             first = True;
             for i in bbox:
                 color = (255,0,0) if first else (255,255,255)

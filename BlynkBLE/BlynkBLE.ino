@@ -1,6 +1,9 @@
 #define BLYNK_PRINT Serial
 
 #define BLYNK_USE_DIRECT_CONNECT
+#define FACE_R 200
+#define FACE_L 201
+#define BREAK 202
 
 #include <M5StickC.h>
 #include <BlynkSimpleEsp32_BLE.h>
@@ -9,6 +12,9 @@
 
 // UART
 HardwareSerial serial_ext(2);
+
+int rData = 0;        // UARTから受信したデータ
+int16_t AI = 0;       // 自動運転有効/無効
 
 int u_read() {
   int ret = -1;
@@ -23,13 +29,13 @@ int u_read() {
           if (serial_ext.available()>0) {
             rx_size = serial_ext.readBytes(rx_buffer, 1);
             ret = rx_buffer[0];
-            printf("%d - %d\n", rx_size, ret);
+            printf("**** %d - %d\n", rx_size, ret);
           }
         }
       }
     }
   }
-  printf("uread:%d\n", ret);
+  printf("uread:%d  rData:%d\n", ret, rData);
   return ret;
 }
 
@@ -47,7 +53,7 @@ void SetChargingCurrent(uint8_t CurrentLevel)
 // 指定アドレスにｎバイト書き込み
 uint8_t I2CWritebuff(uint8_t Addr, uint8_t *Data, uint16_t Length)
 {
-  Serial.printf("power = %d, %d, %d, %d\n", Data[0], Data[1], Data[2], Data[3]);
+//  Serial.printf("power = %d, %d, %d, %d\n", Data[0], Data[1], Data[2], Data[3]);
   Wire.beginTransmission(0x38);
   Wire.write(Addr);
   for (int i = 0; i < Length; i++) {
@@ -96,10 +102,15 @@ uint8_t r_rightleft = LEVER_LEFT_CENTER;
 
 void control() {
   int8_t speed_sendbuff[4] = {0};
-  float f, b, l, r, rr, rl = 0.0;
+  float f = 0.0;
+  float b = 0.0;
+  float l = 0.0;
+  float r = 0.0;
+  float rr = 0.0;
+  float rl = 0.0;
   float limit = 1.0;
-  Serial.printf("Lrf:%d Lud:%d Rud:%d\n", l_rightleft, l_updown, r_rightleft);
-  Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
+//  Serial.printf("Lrf:%d Lud:%d Rud:%d\n", l_rightleft, l_updown, r_rightleft);
+//  Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
   // 左スティックが倒されていたら（上下）
   if ((unsigned)l_updown != (unsigned)LEVER_LEFT_CENTER) {
     if ((unsigned)l_updown < (unsigned)LEVER_LEFT_CENTER) {
@@ -141,7 +152,7 @@ void control() {
 //    printf("rr = %f\n", rr);
     }
   }
-  Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
+//  Serial.printf("f:%f b:%f l:%f r:%f rr:%f rl:%f\n", f, b, l, r, rr, rl);
 
   // 前後左右回転それぞれをスティックの倒れ具合と掛けて足す
   for (int i = 0; i < 4; i++) {
@@ -169,13 +180,17 @@ void control() {
   }
   for (int i = 0; i < 4; i++) {
     speed_sendbuff[i] = speed_sendbuff[i] * limit;
+    if (AI != 0 && rData == BREAK) {
+      if (speed_sendbuff[i] > 0) {
+        speed_sendbuff[i] = 0;
+      }
+    }
   }
-//  Serial.printf("power = %d, %d, %d, %d\n", speed_sendbuff[0], speed_sendbuff[1], speed_sendbuff[2], speed_sendbuff[3]);
+  Serial.printf("power = %d, %d, %d, %d\n", speed_sendbuff[0], speed_sendbuff[1], speed_sendbuff[2], speed_sendbuff[3]);
 
   I2CWritebuff(0x00, (uint8_t *)speed_sendbuff, 4);
 }
 
-int16_t face = 0;
 
 byte RR[] = {20,-20,20,-20};
 byte RL[] = {-20,20,-20,20};
@@ -184,16 +199,19 @@ void loop()
 {
   Blynk.run();
   control();
-  int r = u_read();
-  if (r != -1) {          // UARTの入力があった
-    if (face != 0){
-      if (r == 1) {
+  int tmp = u_read();
+  if (tmp != -1) {          // UARTの入力があった
+    rData = tmp;
+    if (AI != 0){
+      if (rData == FACE_L) {
         I2CWritebuff(0x00, (uint8_t *)RR, 4);
-      } else if (r = 2) {
+        delay(50);
+        I2CWritebuff(0x00, (uint8_t *)STP, 4);
+      } else if (rData == FACE_R) {
         I2CWritebuff(0x00, (uint8_t *)RL, 4);
+        delay(50);
+        I2CWritebuff(0x00, (uint8_t *)STP, 4);
       }
-      delay(50);
-      I2CWritebuff(0x00, (uint8_t *)STP, 4);
     }
     for (;;) {           // UARTのクリア
       if (serial_ext.available() == 0) {
@@ -206,8 +224,8 @@ void loop()
 }
 
 BLYNK_WRITE(V0) {
-  face = param[0].asInt();
-  if (face == 0){
+  AI = param[0].asInt();
+  if (AI == 0){
     digitalWrite(GPIO_NUM_10, HIGH);
   } else {
     digitalWrite(GPIO_NUM_10, LOW);
